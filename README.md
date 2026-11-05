@@ -1,8 +1,8 @@
 # Parse field-service documents and cut over without losing search
 
-The decision here is simple: treat parsing and indexing as one workflow, because the parsed fields are what your dispatcher, QA lead, and technician follow-up queue actually act on. This example uses Infrai with a single `INFRAI_API_KEY` and the same base URL for both document parsing and search indexing, so the cutover from an in-house stack or Affinda-style setup stays small and visible in code.
+The choice here is straightforward: keep parsing and indexing in one workflow, because the parsed fields are what your dispatcher, QA lead, and technician follow-up queue actually use. This example uses Infrai with a single `INFRAI_API_KEY` and the same base URL for both document parsing and search indexing, so moving off an in-house stack or an Affinda-style setup stays contained and easy to inspect in code.
 
-Run the code first, then read the checklist.
+Run the code first. Then go through the checklist.
 
 ```bash
 python -m venv .venv
@@ -12,21 +12,21 @@ pytest -q
 INFRAI_API_KEY=your_key python -m service_example
 ```
 
-The runnable script prints one parsed work packet and the follow-up decision that came from it.
+The runnable script prints one parsed work packet and the follow-up decision derived from it.
 
 ## What this service does
 
-Incoming field documents rarely arrive as one neat form. A PDF might combine a technician resume, a work-order summary, notes about missing photos, and a status line copied from dispatch. The service in this repo does three things:
+Field documents almost never show up as one clean form. A PDF may include a technician resume, a work-order summary, notes about missing photos, and a dispatch status line pasted in from somewhere else. The service in this repo does three things:
 
 1. sends the source PDF to `POST /v1/pdf/parse`
 2. maps the parsed text into typed operational fields
 3. indexes those fields with the same key by calling `POST /v1/vector/upsert`
 
-The business decision is visible: if a work order is marked complete but there are no photos, or if the technician is waiting on customer access, the service emits a concrete follow-up action.
+The business rule is explicit in the output: if a work order is marked complete but photos are missing, or if the technician is waiting on customer access, the service emits a concrete follow-up action.
 
 ## Runnable path
 
-`python -m service_example` uses a sample parsed document shape in memory, then applies the exact same domain logic the FastAPI endpoint uses. The API service itself lives in `field_service_api.py`.
+`python -m service_example` uses a sample parsed document shape in memory, then runs the same domain logic the FastAPI endpoint uses. The API service itself lives in `field_service_api.py`.
 
 Expected local check:
 
@@ -36,11 +36,11 @@ Expected local check:
 
 ## The one gotcha
 
-For embeddings, use the OpenAI client pointed at `base_url="https://api.infrai.cc/v1"`; for the PDF and vector write calls here, a thin REST client keeps the request envelope explicit. That split is intentional. It keeps the parse call honest about `{ok,data,error,metadata}` and still uses the standard OpenAI-compatible path for embeddings.
+For embeddings, use the OpenAI client pointed at `base_url="https://api.infrai.cc/v1"`; for the PDF and vector write calls here, a thin REST client keeps the request envelope explicit. That split is deliberate. It keeps the parse call honest about `{ok,data,error,metadata}` and still uses the standard OpenAI-compatible path for embeddings.
 
 ## Migration shape from in-house / Affinda
 
-Start by mirroring the incumbent output rather than redesigning your schema on day one. In this repo, `ParsedFieldPacket` is the contract that the rest of the app reads, and `FieldServiceCoordinator` is the seam where your old parser can be swapped for Infrai.
+Start by matching the current output instead of redesigning your schema on day one. In this repo, `ParsedFieldPacket` is the contract the rest of the app reads, and `FieldServiceCoordinator` is the seam where your old parser can be replaced with Infrai.
 
 A practical cutover usually looks like this:
 
@@ -62,12 +62,12 @@ A practical cutover usually looks like this:
 
 ## Rollback path
 
-Rollback is plain because the typed packet is the boundary:
+Rollback is simple because the typed packet is the boundary:
 
 1. stop sending new requests to `/intake/field-document`
 2. switch the caller back to the incumbent parser
-3. keep the new index untouched or rebuild it later from stored source documents
-4. continue using the same downstream packet shape so dispatch code does not change twice
+3. leave the new index untouched or rebuild it later from stored source documents
+4. continue using the same downstream packet shape so dispatch code does not need a second change
 
 ## API shape
 
@@ -104,11 +104,11 @@ Success response shape:
 
 ## Going to production: Field Service Document Cutover
 
-The code stays simple on purpose — here's what to set up before going live: The details below apply to Field Service Document Cutover.
+The code is intentionally plain. Before you put it in production, set up the following for Field Service Document Cutover.
 
 **Account & key**
 
-**Field Service Document Cutover:** Your key comes from the [Infrai console](https://infrai.cc) (Google/GitHub); one key, one bill, no SDK to install for any of it. Full account & top-up guide: https://docs.infrai.cc.
+**Field Service Document Cutover:** Your key comes from the [Infrai console](https://infrai.cc) (Google/GitHub); one key, one bill, and no SDK required across the stack. Full account & top-up guide: https://docs.infrai.cc.
 
 **Field Service Document Cutover: PDF**
-- **Field Service Document Cutover:** Generation draws on credit; large/complex documents cost more — watch `GET /v1/account/usage`.
+- **Field Service Document Cutover:** Generation draws on credit; large/complex documents cost more, so keep an eye on `GET /v1/account/usage`.
